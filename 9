@@ -1,0 +1,47 @@
+# Verify Snort installed
+snort -V
+
+# Note interface name
+ip a
+
+# Edit local rules
+sudo nano /etc/snort/rules/local.rules
+-----------------------------------------------------------------------------
+# SYN scan / possible SYN flood
+alert tcp any any -> $HOME_NET any (msg:"[IDS] Possible TCP SYN scan/flood"; flags:S; detection_filter: track by_src, count 20, seconds 5; sid:1000001; rev:1;)
+
+# UDP scan
+alert udp any any -> $HOME_NET any (msg:"[IDS] Possible UDP scan"; detection_filter: track by_src, count 40, seconds 60; sid:1000002; rev:1;)
+
+# ICMP ping sweep
+alert icmp any any -> $HOME_NET any (msg:"[IDS] ICMP echo request sweep"; itype:8; detection_filter: track by_src, count 10, seconds 60; sid:1000003; rev:1;)
+
+# FIN scan
+alert tcp any any -> $HOME_NET any (msg:"[IDS] Possible FIN scan"; flags:F; detection_filter: track by_src, count 5, seconds 60; sid:1000004; rev:1;)
+
+# NULL scan
+alert tcp any any -> $HOME_NET any (msg:"[IDS] Possible NULL scan"; flags:0; detection_filter: track by_src, count 5, seconds 60; sid:1000005; rev:1;)
+
+# XMAS scan
+alert tcp any any -> $HOME_NET any (msg:"[IDS] Possible XMAS scan"; flags:FPU; detection_filter: track by_src, count 5, seconds 60; sid:1000006; rev:1;)
+
+# Generic TCP port scan (many SYNs)
+alert tcp any any -> $HOME_NET any (msg:"[IDS] Generic TCP portscan (SYN probes)"; flags:S; detection_filter: track by_src, count 15, seconds 60; sid:1000007; rev:1;)
+---------------------------------------------------------------------------------------------------------------------
+
+# Test snort config (syntax)
+sudo snort -T -c /etc/snort/snort.conf
+
+# Run Snort in IDS mode (console alerts)
+sudo snort -A console -q -c /etc/snort/snort.conf -i eth0   # replace eth0 with your iface
+
+# Generate test scans (on attacker machine or same host using loopback)
+# Install nmap if needed
+sudo apt install -y nmap
+
+# Examples (run from another terminal)
+ping -c 12 127.0.0.1                          # ICMP sweep
+sudo nmap -sS -p 1-1000 --min-rate 200 127.0.0.1     # SYN scan
+sudo nmap -sF -p 1-200 --min-rate 100 127.0.0.1       # FIN scan
+sudo nmap -sN -p 1-200 --min-rate 100 127.0.0.1       # NULL scan
+sudo nmap -sX -p 1-200 --min-rate 100 127.0.0.1       # XMAS scan
