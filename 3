@@ -1,0 +1,9 @@
+# Add rule
+sudo nano /etc/snort/rules/local.rules
+alert tcp any any -> any 80 (msg:"Possible Sensitive Path Access"; flow:to_server,established; content:"GET"; http_method; content:"/admin"; http_uri; nocase; sid:1000001; rev:1;)
+
+# Run Snort in IDS mode
+sudo snort -A console -q -c /etc/snort/snort.conf -i eth0
+
+# Simulate attacker
+curl -v http://localhost/secret/admin/config
