@@ -1,0 +1,15 @@
+# Update & install dependencies
+sudo apt update && sudo apt install -y build-essential libpcap-dev libpcre3-dev libdumbnet-dev bison flex zlib1g-dev
+
+# Create directories
+sudo mkdir -p /etc/snort /var/log/snort /usr/local/lib/snort_dynamicrules
+
+# Edit main config
+sudo nano /etc/snort/snort.conf
+# → set HOME_NET, RULE_PATH, SO_RULE_PATH
+
+# Test config
+sudo snort -T -c /etc/snort/snort.conf
+
+# Run Snort in IDS mode
+sudo snort -A console -q -c /etc/snort/snort.conf -i eth0
