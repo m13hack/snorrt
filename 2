@@ -1,0 +1,37 @@
+# Edit Snort config
+sudo nano /etc/snort/snort.conf
+# Add line:
+output alert_syslog: LOG_AUTH LOG_ALERT
+
+# Configure rsyslog
+sudo nano /etc/rsyslog.d/snort-email.conf
+if ($programname == 'snort') then {
+    action(type="omprog" binary="/usr/local/bin/snort-mailer.py")
+}
+sudo systemctl restart rsyslog
+
+# Python mailer
+sudo nano /usr/local/bin/snort-mailer.py
+----------------------------------------------------------
+#!/usr/bin/env python3
+import sys, smtplib
+from email.message import EmailMessage
+SMTP_SERVER="smtp.gmail.com"; SMTP_PORT=587
+SMTP_USER="yourgmail@gmail.com"; SMTP_PASS="your_app_password"
+TO_EMAIL="admin@gmail.com"
+alert=sys.stdin.read()
+if alert.strip():
+    msg=EmailMessage()
+    msg.set_content(alert)
+    msg['Subject']="Snort Alert on localhost"
+    msg['From']=SMTP_USER; msg['To']=TO_EMAIL
+    with smtplib.SMTP(SMTP_SERVER,SMTP_PORT) as s:
+        s.starttls(); s.login(SMTP_USER,SMTP_PASS); s.send_message(msg)
+-----------------------------------------------------------------------------
+sudo chmod +x /usr/local/bin/snort-mailer.py
+
+# Run Snort
+sudo snort -A console -q -c /etc/snort/snort.conf -i lo
+
+# Trigger alert
+ping 127.0.0.1
