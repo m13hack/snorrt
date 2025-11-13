@@ -1,0 +1,38 @@
+# Check version / install
+iptables -V
+sudo apt-get install -y iptables
+
+# Show current rules
+sudo iptables -L -v
+
+# Set default policy to DROP (drop all unless allowed)
+sudo iptables -P INPUT DROP
+sudo iptables -P OUTPUT DROP
+sudo iptables -P FORWARD DROP
+
+# Allow established/related traffic
+sudo iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+sudo iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Allow ICMP ping from a specific host (example)
+sudo iptables -A INPUT -p icmp -s 10.0.2.20 -j ACCEPT
+
+# Allow SSH from single IP (example)
+sudo iptables -A INPUT -p tcp --dport 22 -s 10.0.2.7 -m state --state NEW,ESTABLISHED -j ACCEPT
+sudo iptables -A OUTPUT -p tcp --sport 22 -d 10.0.2.7 -m state --state ESTABLISHED -j ACCEPT
+
+# Insert rule at top (example)
+sudo iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
+
+# List rules with line numbers (for deletion)
+sudo iptables -L --line-numbers
+
+# Delete a specific rule (example chain INPUT, rule #2)
+sudo iptables -D INPUT 2
+
+# Flush all rules
+sudo iptables -F
+
+# Save rules to file (distribution dependent)
+sudo /sbin/iptables-save > /etc/iptables/rules.v4
+# or use iptables-persistent / netfilter-persistent on Debian/Ubuntu
