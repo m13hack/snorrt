@@ -1,0 +1,152 @@
+Place Router0, Router1, Router2 (Router2 = Internet hop if used).
+
+Connect PC0 → Router0 F0/0 and PC1 → Router1 F0/0.
+
+Assign IPs:
+
+Router0 F0/0 = 192.168.1.1/24 ; PC0 = 192.168.1.2/24 (GW 192.168.1.1)
+
+Router1 F0/0 = 192.168.2.1/24 ; PC1 = 192.168.2.2/24 (GW 192.168.2.1)
+
+Router0 F0/1 (WAN) = 1.0.0.2/24 ; Router1 F0/1 (WAN) = 2.0.0.2/24
+
+Add static routes so each router can reach the remote LAN via the WAN neighbor (Config → Static routes)
+------------------------
+Router0 (Left / 192.168.1.0 LAN)
+
+
+enable
+configure terminal
+
+! -- Basic interfaces
+interface FastEthernet0/0
+ ip address 192.168.1.1 255.255.255.0
+ no shutdown
+exit
+
+interface FastEthernet0/1
+ ip address 1.0.0.2 255.255.255.0
+ no shutdown
+exit
+
+! -- Tunnel interface (per manual)
+interface Tunnel1
+ ip address 172.16.1.1 255.255.0.0
+ tunnel source FastEthernet0/1
+ tunnel destination 2.0.0.2
+ no shutdown
+exit
+
+! -- Static route to remote LAN (if not using routing protocol)
+ip route 192.168.2.0 255.255.255.0 2.0.0.2
+
+! ---------- IPsec (IKEv1 pre-shared key style) ----------
+! Define interesting traffic: ACL matches local LAN -> remote LAN
+access-list 100 permit ip 192.168.1.0 0.0.0.255 192.168.2.0 0.0.0.255
+
+! IKE Phase 1: ISAKMP policy
+crypto isakmp policy 10
+ encr aes
+ hash sha
+ authentication pre-share
+ group 2
+ lifetime 86400
+exit
+
+! Pre-shared key for peer
+crypto isakmp key MySecretKey address 2.0.0.2
+
+! IKE Phase 2: transform set
+crypto ipsec transform-set TS esp-aes esp-sha-hmac
+
+! Create crypto map and bind ACL -> peer -> transform-set
+crypto map CMAP 10 ipsec-isakmp
+ set peer 2.0.0.2
+ set transform-set TS
+ match address 100
+ set pfs group2
+ set security-association lifetime seconds 3600
+exit
+
+! Apply crypto map to the WAN interface (outbound)
+interface FastEthernet0/1
+ crypto map CMAP
+exit
+
+end
+write memory
+-----------------------------------------------------
+Router1 (Right / 192.168.2.0 LAN)
+
+
+enable
+configure terminal
+
+! -- Basic interfaces
+interface FastEthernet0/0
+ ip address 192.168.2.1 255.255.255.0
+ no shutdown
+exit
+
+interface FastEthernet0/1
+ ip address 2.0.0.2 255.255.255.0
+ no shutdown
+exit
+
+! -- Tunnel interface
+interface Tunnel2
+ ip address 172.16.1.2 255.255.0.0
+ tunnel source FastEthernet0/1
+ tunnel destination 1.0.0.2
+ no shutdown
+exit
+
+! -- Static route to remote LAN
+ip route 192.168.1.0 255.255.255.0 1.0.0.2
+
+! ---------- IPsec (mirror of Router0) ----------
+access-list 100 permit ip 192.168.2.0 0.0.0.255 192.168.1.0 0.0.0.255
+
+crypto isakmp policy 10
+ encr aes
+ hash sha
+ authentication pre-share
+ group 2
+ lifetime 86400
+exit
+
+crypto isakmp key MySecretKey address 1.0.0.2
+
+crypto ipsec transform-set TS esp-aes esp-sha-hmac
+
+crypto map CMAP 10 ipsec-isakmp
+ set peer 1.0.0.2
+ set transform-set TS
+ match address 100
+ set pfs group2
+ set security-association lifetime seconds 3600
+exit
+
+interface FastEthernet0/1
+ crypto map CMAP
+exit
+
+end
+write memory
+----------------------------------------
+Verification commands
+
+show ip interface brief
+show ip route
+show access-lists 100
+
+! IKE / ISAKMP
+show crypto isakmp sa
+
+! IPsec SAs / counters
+show crypto ipsec sa
+show crypto engine connections active
+
+! Crypto map and interface binding
+show crypto map
+show run | section crypto
