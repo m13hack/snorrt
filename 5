@@ -1,0 +1,29 @@
+# Add loopback aliases (simulate attacker and target on same host)
+sudo ip addr add 127.0.0.2/8 dev lo
+sudo ip addr add 127.0.0.3/8 dev lo
+ip -4 addr show dev lo
+
+# Start Snort on loopback (console alerts)
+sudo snort -A console -q -c /etc/snort/snort.conf -i lo
+
+# Start tcpdump capture to pcap (in another terminal)
+sudo tcpdump -i lo -nn -w loopback_capture.pcap
+
+# Generate test traffic between aliases:
+# ICMP ping from attacker (alias) to target (alias)
+ping -I 127.0.0.2 -c 4 127.0.0.3
+
+# Simple HTTP server bound to target alias (port 8080)
+python3 -m http.server 8080 --bind 127.0.0.3 &
+
+# From attacker alias request the server
+curl --interface 127.0.0.2 http://127.0.0.3:8080/
+
+# Nmap SYN scan from alias to alias
+sudo apt install -y nmap
+sudo nmap -e lo -sS -p 22,80,8080 127.0.0.3
+
+# Stop tcpdump (Ctrl+C) and Snort (Ctrl+C). Analyze pcap:
+tcpdump -r loopback_capture.pcap -nn -tttt
+# Or open in Wireshark
+wireshark loopback_capture.pcap &
